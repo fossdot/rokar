@@ -131,19 +131,33 @@ function persist(){ saveLocal(); }
 
 /* ---------------- boot ---------------- */
 function boot(){
+  buildStatic();
+  var raw=Storage.load();
+  if(raw && typeof raw.then==="function"){
+    /* Frappe adapter: render the empty shell now, fill it when the books arrive. */
+    renderAll();
+    raw.then(applyLoaded).catch(function(e){
+      setBanner("info","Could not reach the server",
+                (e&&e.message)||"The books could not be loaded. Nothing has been changed.");
+    });
+  } else {
+    applyLoaded(raw);
+  }
+}
+function applyLoaded(raw){
   try{
-    var raw=Storage.load();
-    if(raw){ var p=JSON.parse(raw); S.entries=p.entries||[]; S.days=p.days||{}; S.sample=!!p.sample; S.openingSeed=n(p.openingSeed);
+    if(raw){ var p=JSON.parse(raw);
+             S.entries=p.entries||[]; S.days=p.days||{}; S.sample=!!p.sample; S.openingSeed=n(p.openingSeed);
              if(p.people&&p.people.length) S.people=p.people;
              if(p.approvers&&p.approvers.length) S.approvers=p.approvers;
              if(p.payees&&p.payees.length) S.payees=p.payees;
              if(p.accounts) S.accounts=p.accounts;
              if(p.particulars) S.particulars=p.particulars; }
   }catch(e){}
-  if(!S.entries.length && !Object.keys(S.days).length) seed();
-  buildStatic();
+  if(!S.entries.length && !Object.keys(S.days).length && Storage.mode!=="frappe") seed();
   renderAll();
 }
+
 /* Storage lives in Storage.load/save (storage.js) so this file never
    assumes where the books are kept. Swap that module to move off the browser. */
 
@@ -292,6 +306,10 @@ function addPerson(key,sel,ask){
   var exists=S[key].filter(function(x){return x.toLowerCase()===nm.toLowerCase();})[0];
   if(exists) nm=exists; else { S[key].push(nm); S[key].sort(); }
   fillPeople(); $(sel).value=nm; persist(); renderSlip();
+  if(Storage.addMaster){
+    var dt={people:"Rokar Person",approvers:"Rokar Person",payees:"Rokar Payee"}[key];
+    if(dt) Storage.addMaster(dt,nm).catch(function(){ /* already exists: harmless */ });
+  }
 }
 
 /* ---------------- voucher ---------------- */
@@ -390,6 +408,17 @@ function addVoucher(ev){
   }
   if(!S.days[d.date]) S.days[d.date]={date:d.date,opening:openingFor(d.date),fee:0,bus:0,wdl:0,other:0,deposit:0,upi:0,denoms:{},closed:false};
   persist(); resetForm(); renderAll();
+  if(Storage.saveVoucher){
+    Storage.saveVoucher(d).then(function(saved){
+      d.no=saved.name; d.id=saved.name; d.serverSaved=true;   /* adopt Frappe's series number */
+      persist(); renderAll();
+    }).catch(function(err){
+      S.entries=S.entries.filter(function(x){return x.id!==d.id;});   /* do not keep a row the server rejected */
+      persist(); renderAll();
+      alert("The server did not accept this voucher:\n\n"+((err&&err.message)||"unknown error")+
+            "\n\nNothing was saved. Check the entry and try again.");
+    });
+  }
 }
 /* Keeps date, unit, cost head, Debited A/c and both signatories — a clerk
    entering ten School vouchers in a row only retypes payee, detail, amount. */
@@ -468,6 +497,12 @@ function saveDay(){
              wdl:n($("#d-wdl").value),other:n($("#d-oth").value),deposit:n($("#d-dep").value),
              upi:n($("#d-upi").value),denoms:dn,closed:true};
   persist(); $("#d-note").textContent="Closed"; renderAll();
+  if(Storage.saveDay){
+    Storage.saveDay(S.days[d]).catch(function(err){
+      setBanner("info","Day not saved to the server",
+                ((err&&err.message)||"unknown error")+" — it is still held in this browser.");
+    });
+  }
 }
 function countedOf(d){
   var day=S.days[d]||{}; var t=0;
