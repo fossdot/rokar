@@ -63,7 +63,7 @@ That means clearing browser data, reinstalling, or moving to another computer
 "Restore from backup" reads that file back, after showing you what is in it versus
 what is on the computer now.
 
-### Moving the books to a server
+### Moving the books to a server — Frappe
 
 `storage.js` is the seam. It exposes exactly two functions:
 
@@ -72,9 +72,43 @@ Storage.load()      // -> raw JSON string, or null
 Storage.save(obj)   // -> {ok:true} | {ok:false, error:"..."}
 ```
 
-Point those at Supabase, Pocketbase, a Frappe endpoint, whatever — and make them
-async, changing `boot()` in `app.js` to await the load. Nothing else in the app
-knows or cares where the data sits.
+A **Frappe backend already exists**: the `rokar` app at
+`~/code/frappe-bench/apps/rokar`. To use it, swap the script tag in `index.html`:
+
+```html
+<script src="storage-frappe.js"></script>   <!-- instead of storage.js -->
+```
+
+`storage-frappe.js` is async, so `boot()` in `app.js` must `await Storage.load()`.
+The file's closing comment spells out that change.
+
+**Install the Frappe app:**
+
+```bash
+cd ~/code/frappe-bench
+bench start                                    # in another terminal
+bench new-site rokar.localhost                 # asks for the MariaDB root password
+bench --site rokar.localhost install-app rokar
+bench --site rokar.localhost add-system-manager vishal@fossunited.org
+```
+
+What Frappe adds over browser storage:
+
+| | Browser | Frappe |
+|---|---|---|
+| Survives a cleared browser | no | yes |
+| Two people entering at once | no | yes |
+| Voucher immutable once passed | no | yes — submit/cancel |
+| Who changed what, when | no | yes — version history |
+| Clerk enters, accountant approves | no | yes — Rokar Clerk / Rokar Auditor roles |
+| Voucher print layout | in `app.js` | a Print Format the school can edit |
+
+The DocTypes enforce the rules server-side, so they hold no matter which
+frontend writes: cost head required for STL and stripped elsewhere, `passed_by`
+cleared on Construction, opening balance carried from the last closed day, cash
+expenses summed from submitted vouchers, and a **written reason required whenever
+the denomination count does not match the day's collection** — the ₹100 gap on
+01-09-2026 could not have passed silently.
 
 ## Notes
 
