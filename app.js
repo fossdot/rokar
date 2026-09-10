@@ -90,7 +90,8 @@ function seed(){
   var dayOf=[day-2,day-2,day-1,day-1,day,day,day,day-1,day];
   S.entries=E.map(function(r,i){
     return {id:uid(),no:"NGHS/"+FYCODE+"/"+String(i+1).padStart(4,"0"),date:dd(dayOf[i]),
-            account:r[0],payee:r[1],address:r[2],particulars:r[3],amount:r[4],
+            account:r[0],payee:r[1],address:r[2],
+            items:[{particulars:r[3],amount:r[4]}],particulars:r[3],amount:r[4],
             category:r[5],head:(r[5]==="STL"?r[6]:""),by:r[7],mode:r[8],approved:"Shams",sample:true,ts:Date.now()+i};
   });
   var open=34530;
@@ -169,6 +170,7 @@ function buildStatic(){
   buildHeadChips("School");
   suggestAccount("School");
   applySigRules("School");
+  setItems();
   fillPeople();
   var tb=$("#d-denoms");
   DENOMS.forEach(function(f){
@@ -191,9 +193,9 @@ function buildStatic(){
   $("#add-by").addEventListener("click",function(){ addPerson("people","#f-by","Name of the person who spent the cash"); });
   $("#add-appr").addEventListener("click",function(){ addPerson("approvers","#f-appr","Name of the person who passes the voucher"); });
   $("#add-payee").addEventListener("click",function(){ addPerson("payees","#f-payee","Name of the vendor, contractor or person being paid"); });
-  attachSuggest("#f-part","#part-sug",function(){return S.particulars;});
-  ["f-date","f-payee","f-addr","f-acct","f-part","f-amt","f-by","f-mode","f-appr"].forEach(function(id){
-    $("#"+id).addEventListener("input",function(){ if(id==="f-amt") $("#f-words").textContent=words($("#f-amt").value); renderSlip(); });
+  $("#add-item").addEventListener("click",function(){ addItemRow(); });
+  ["f-date","f-payee","f-addr","f-acct","f-by","f-mode","f-appr"].forEach(function(id){
+    $("#"+id).addEventListener("input",renderSlip);
   });
   $("#vform").addEventListener("submit",addVoucher);
   $("#v-clear").addEventListener("click",resetForm);
@@ -240,6 +242,47 @@ function startReal(){
   var d=todayISO();
   S.days[d]={date:d,opening:S.openingSeed,fee:0,bus:0,wdl:0,other:0,deposit:0,upi:0,denoms:{},closed:false};
   persist(); renderAll();
+}
+
+/* ---------------- voucher lines ---------------- */
+/* A voucher is a list of lines, like the paper form's numbered rows.
+   Older saved entries hold a single particulars/amount pair; itemsOf()
+   presents those as a one-line voucher so nothing needs migrating. */
+function itemsOf(e){
+  if(e && e.items && e.items.length) return e.items;
+  return [{particulars:(e&&e.particulars)||"",amount:(e&&e.amount)||0}];
+}
+function addItemRow(vals){
+  var box=$("#f-items"), row=el("div","itemrow");
+  var p=el("input"); p.type="text"; p.setAttribute("list","particularsList");
+  p.placeholder="e.g. Gas cylinder refilling 1 pcs"; p.className="i-part";
+  p.autocomplete="off"; p.value=(vals&&vals.particulars)||"";
+  var a=el("input"); a.type="number"; a.min="0"; a.step="1"; a.className="i-amt num";
+  a.placeholder="0"; a.value=(vals&&vals.amount)||"";
+  var x=el("button","i-del"); x.type="button"; x.textContent="\u00d7"; x.title="Remove this line";
+  x.addEventListener("click",function(){
+    row.remove();
+    if(!$$(".itemrow",box).length) addItemRow();
+    renumberItems(); renderSlip();
+  });
+  [p,a].forEach(function(f){ f.addEventListener("input",function(){ renderSlip(); }); });
+  row.appendChild(el("span","i-sn",""));
+  row.appendChild(p); row.appendChild(a); row.appendChild(x);
+  box.appendChild(row);
+  renumberItems();
+  return row;
+}
+function renumberItems(){
+  $$("#f-items .itemrow").forEach(function(r,i){ $(".i-sn",r).textContent=(i+1)+"."; });
+}
+function readItems(){
+  return $$("#f-items .itemrow").map(function(r){
+    return {particulars:$(".i-part",r).value.trim(), amount:n($(".i-amt",r).value)};
+  }).filter(function(i){ return i.particulars || i.amount; });
+}
+function setItems(list){
+  $("#f-items").innerHTML="";
+  (list&&list.length?list:[{particulars:"",amount:""}]).forEach(addItemRow);
 }
 
 /* ---------------- chips & roster ---------------- */
@@ -319,8 +362,12 @@ function nextNo(){
   return "NGHS/"+FYCODE+"/"+String(mx+1).padStart(4,"0");
 }
 function formData(){
-  return {date:$("#f-date").value,payee:$("#f-payee").value,particulars:$("#f-part").value.trim(),
-          amount:n($("#f-amt").value),category:pressed("#f-cat"),head:pressed("#f-head"),
+  var items=readItems();
+  return {date:$("#f-date").value,payee:$("#f-payee").value,
+          items:items,
+          particulars:items.map(function(i){return i.particulars;}).filter(Boolean).join("; "),
+          amount:items.reduce(function(a,i){return a+n(i.amount);},0),
+          category:pressed("#f-cat"),head:pressed("#f-head"),
           account:$("#f-acct").value.trim(),address:$("#f-addr").value.trim(),
           by:$("#f-by").value,mode:$("#f-mode").value,
           approved:(pressed("#f-cat")==="Construction")?"":$("#f-appr").value};
@@ -331,6 +378,8 @@ function formData(){
 function renderSlip(){
   var d=formData(), no=nextNo();
   $("#next-no").textContent="Next: "+no;
+  $("#f-total").textContent=inr(d.amount);
+  $("#f-words").textContent=d.amount?words(d.amount):"\u2014";
   var s=$("#slip"); s.innerHTML="";
 
   var mh=el("div","mh");
@@ -360,14 +409,20 @@ function renderSlip(){
   htr.appendChild(el("th","c-amt","Amount"));
   th.appendChild(htr); t.appendChild(th);
 
-  var tb=el("tbody"), r1=el("tr");
-  r1.appendChild(el("td","c-sn","1."));
-  r1.appendChild(el("td",null,d.particulars||""));
-  r1.appendChild(el("td","c-amt",d.amount?inr(d.amount):""));
-  tb.appendChild(r1);
-  var blank=el("tr","filler");
-  blank.appendChild(el("td","c-sn")); blank.appendChild(el("td")); blank.appendChild(el("td","c-amt"));
-  tb.appendChild(blank);
+  var tb=el("tbody");
+  var lines=d.items.filter(function(i){return i.particulars||i.amount;});
+  lines.forEach(function(it,i){
+    var tr=el("tr");
+    tr.appendChild(el("td","c-sn",(i+1)+"."));
+    tr.appendChild(el("td",null,it.particulars||""));
+    tr.appendChild(el("td","c-amt",it.amount?inr(it.amount):""));
+    tb.appendChild(tr);
+  });
+  for(var b=lines.length;b<4;b++){
+    var blank=el("tr","filler");
+    blank.appendChild(el("td","c-sn")); blank.appendChild(el("td")); blank.appendChild(el("td","c-amt"));
+    tb.appendChild(blank);
+  }
   t.appendChild(tb);
 
   var tf=el("tfoot"), wr=el("tr","wordrow");
@@ -395,17 +450,20 @@ function renderSlip(){
 function addVoucher(ev){
   ev.preventDefault();
   var d=formData();
-  if(!d.amount||d.amount<=0){ alert("Enter an amount greater than zero."); return; }
-  if(!d.payee||!d.particulars){ alert("Fill in who was paid and what for."); return; }
+  if(!d.items.length){ alert("Add at least one line to the voucher."); return; }
+  var bad=0;
+  d.items.forEach(function(i,ix){ if(!i.particulars||!(n(i.amount)>0)) bad=bad||ix+1; });
+  if(bad){ alert("Line "+bad+" needs both a description and an amount above zero."); return; }
+  if(!d.payee){ alert("Choose who was paid."); return; }
   if(!d.account){ alert("Enter the account to debit \u2014 it prints on the voucher."); $("#f-acct").focus(); return; }
   if(d.category==="STL"&&!d.head){ alert("Pick a cost head \u2014 STL vouchers need one."); return; }
   d.id=uid(); d.no=nextNo(); d.ts=Date.now();
   S.entries.push(d);
   if(d.account && S.accounts.indexOf(d.account)<0) S.accounts.push(d.account);
-  if(d.particulars && S.particulars.indexOf(d.particulars)<0){
-    S.particulars.unshift(d.particulars);
-    S.particulars=S.particulars.slice(0,400);   /* keep the suggestion list bounded */
-  }
+  d.items.forEach(function(it){
+    if(it.particulars && S.particulars.indexOf(it.particulars)<0) S.particulars.unshift(it.particulars);
+  });
+  S.particulars=S.particulars.slice(0,400);     /* keep the suggestion list bounded */
   if(!S.days[d.date]) S.days[d.date]={date:d.date,opening:openingFor(d.date),fee:0,bus:0,wdl:0,other:0,deposit:0,upi:0,denoms:{},closed:false};
   persist(); resetForm(); renderAll();
   if(Storage.saveVoucher){
@@ -424,8 +482,8 @@ function addVoucher(ev){
    entering ten School vouchers in a row only retypes payee, detail, amount. */
 function resetForm(){
   var keepDate=$("#f-date").value;
-  $("#f-addr").value=""; $("#f-part").value=""; $("#f-amt").value="";
-  $("#f-date").value=keepDate||todayISO(); $("#f-words").textContent="—";
+  $("#f-addr").value=""; setItems([{particulars:"",amount:""}]);
+  $("#f-date").value=keepDate||todayISO();
   renderSlip(); $("#f-payee").focus();
 }
 function delEntry(id){
@@ -569,7 +627,13 @@ function renderRegister(){
     tr.appendChild(el("td",null,dmy(e.date)));
     tr.appendChild(el("td",null,e.account||"\u2014"));
     tr.appendChild(el("td",null,e.payee));
-    var pt=el("td",null,e.particulars); pt.style.maxWidth="280px"; tr.appendChild(pt);
+    var its=itemsOf(e);
+    var pt=el("td",null,its[0]?its[0].particulars:"");
+    if(its.length>1){
+      var more=el("div",null,"+"+(its.length-1)+" more line"+(its.length>2?"s":""));
+      more.style.cssText="font-size:11px;color:var(--muted);margin-top:2px"; pt.appendChild(more);
+    }
+    pt.style.maxWidth="280px"; tr.appendChild(pt);
     var c=el("td"); c.appendChild(el("span","pill p-"+e.category.toLowerCase(),e.category)); tr.appendChild(c);
     tr.appendChild(el("td",null,e.head||"\u2014"));
     tr.appendChild(el("td",null,e.by));
@@ -730,10 +794,15 @@ function offer(filename,text,mime){
 
 function exportRegister(){
   var mk=$("#r-month").value;
-  var rows=[["Voucher No","Date","Debited A/c","Paid To","Address","Particulars","Unit","Cost Head","Spent By","Passed By","Mode","Amount"]];
+  var rows=[["Voucher No","Line","Date","Debited A/c","Paid To","Address","Particulars",
+             "Unit","Cost Head","Spent By","Passed By","Mode","Line Amount","Voucher Total"]];
   S.entries.filter(function(e){return ym(e.date)===mk;}).sort(function(a,b){return a.date<b.date?-1:1;})
-    .forEach(function(e){ rows.push([e.no,dmy(e.date),e.account||"",e.payee,e.address||"",e.particulars,
-                                     e.category,e.head,e.by,e.approved||"",e.mode,e.amount]); });
+    .forEach(function(e){
+      itemsOf(e).forEach(function(it,i){
+        rows.push([e.no,i+1,dmy(e.date),e.account||"",e.payee,e.address||"",it.particulars,
+                   e.category,e.head,e.by,e.approved||"",e.mode,it.amount,i===0?e.amount:""]);
+      });
+    });
   offer("register-"+mk+".csv",csv(rows));
 }
 function exportTally(){
@@ -742,9 +811,11 @@ function exportTally(){
   S.entries.filter(function(e){return ym(e.date)===mk;}).sort(function(a,b){return a.date<b.date?-1:1;})
     .forEach(function(e){
       var cr=e.mode==="cash"?"Cash":(e.mode==="upi"?"ICICI Bank (UPI)":"ICICI Bank");
-      rows.push([dmy(e.date),e.no,"Payment",e.account||(e.head+" - "+e.category),cr,
-                 e.head?(e.category+" : "+e.head):e.category,e.amount,
-                 e.particulars+" \u2014 paid to "+e.payee+", by "+e.by]);
+      itemsOf(e).forEach(function(it){
+        rows.push([dmy(e.date),e.no,"Payment",e.account||(e.head+" - "+e.category),cr,
+                   e.head?(e.category+" : "+e.head):e.category,it.amount,
+                   it.particulars+" \u2014 paid to "+e.payee+", by "+e.by]);
+      });
     });
   offer("tally-"+mk+".csv",csv(rows));
 }
@@ -768,6 +839,7 @@ function renderAll(){
     vals.forEach(function(v){ if(v&&!seen[v]){seen[v]=1; box.appendChild(new Option(v));} });
   }
   datalist("#addresses",S.entries.map(function(e){return e.address;}));
+  datalist("#particularsList",S.particulars);
   datalist("#accounts",CATS.map(function(c){return DEFAULT_ACCOUNTS[c];})
             .concat(S.accounts).concat(S.entries.map(function(e){return e.account;})));
   var mk=ym(todayISO());
@@ -780,43 +852,6 @@ function renderAll(){
   if(!$("#v-reports").hidden) renderReports();
 }
 boot();
-
-/* ---------------- suggestions from history ---------------- */
-/* A <datalist> cannot attach to a <textarea>, so Particulars gets a small
-   list of its own: the last matching entries the office actually typed. */
-function attachSuggest(inputSel,listSel,getPool){
-  var inp=$(inputSel), list=$(listSel), idx=-1;
-  function close(){ list.hidden=true; list.innerHTML=""; idx=-1; }
-  function choose(v){ inp.value=v; close(); inp.dispatchEvent(new Event("input",{bubbles:true})); inp.focus(); }
-  function open(){
-    var q=inp.value.trim().toLowerCase();
-    var pool=getPool()||[];
-    var hits=(q?pool.filter(function(t){return t.toLowerCase().indexOf(q)>=0 && t.toLowerCase()!==q;}):pool).slice(0,8);
-    if(!hits.length){ close(); return; }
-    list.innerHTML=""; idx=-1;
-    hits.forEach(function(t){
-      var li=el("li",null,t); li.tabIndex=-1;
-      li.addEventListener("mousedown",function(ev){ ev.preventDefault(); choose(t); });
-      list.appendChild(li);
-    });
-    list.hidden=false;
-  }
-  function mark(){
-    $$("li",list).forEach(function(li,i){ li.classList.toggle("on",i===idx); });
-    if(idx>=0) $$("li",list)[idx].scrollIntoView({block:"nearest"});
-  }
-  inp.addEventListener("input",open);
-  inp.addEventListener("focus",open);
-  inp.addEventListener("blur",function(){ setTimeout(close,120); });
-  inp.addEventListener("keydown",function(e){
-    if(list.hidden) return;
-    var items=$$("li",list);
-    if(e.key==="ArrowDown"){ e.preventDefault(); idx=(idx+1)%items.length; mark(); }
-    else if(e.key==="ArrowUp"){ e.preventDefault(); idx=(idx-1+items.length)%items.length; mark(); }
-    else if(e.key==="Enter"&&idx>=0){ e.preventDefault(); choose(items[idx].textContent); }
-    else if(e.key==="Escape"){ close(); }
-  });
-}
 
 /* ---------------- backup & restore ---------------- */
 function backupNow(){

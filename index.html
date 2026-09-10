@@ -60,11 +60,12 @@
             <div class="withadd"><select id="f-payee"></select><button type="button" class="addbtn" id="add-payee" title="Add a new payee">+</button></div></div>
           <div class="field"><label for="f-addr">Address <span class="hi">पता</span></label>
             <input type="text" id="f-addr" list="addresses" placeholder="Mathiya" autocomplete="off"><datalist id="addresses"></datalist></div>
-          <div class="field sug"><label for="f-part">Particulars <span class="hi">विवरण</span></label>
-            <textarea id="f-part" placeholder="e.g. Gas cylinder refilling 1 pcs" autocomplete="off" required></textarea>
-            <ul class="suglist" id="part-sug" hidden></ul></div>
-          <div class="field"><label for="f-amt">Amount ₹ <span class="hi">राशि</span></label>
-            <input type="number" id="f-amt" class="amt-big" min="0" step="1" placeholder="0" required>
+          <div class="field"><label>Particulars <span class="hi">विवरण</span></label>
+            <div id="f-items"></div>
+            <datalist id="particularsList"></datalist>
+            <button type="button" class="btn ghost sm" id="add-item">+ Add line</button></div>
+          <div class="field"><label>Total <span class="hi">कुल</span></label>
+            <div class="totalbox"><span class="lbl">Rupees</span><span class="num" id="f-total">0</span></div>
             <div class="words" id="f-words">—</div></div>
           <div class="field" id="f-headwrap" hidden><label>Cost head <span class="hi">व्यय शीर्ष</span></label>
             <div class="chipset" id="f-head"></div>

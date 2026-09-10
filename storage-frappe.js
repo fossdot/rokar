@@ -48,6 +48,14 @@
     "payee", "address", "particulars", "amount", "spent_by", "passed_by", "docstatus"
   ];
 
+  /* Line items live in a child table, which a list query cannot return —
+     each voucher needs its own fetch to rebuild its lines. */
+  function withItems(v) {
+    return api("/api/resource/Cash Voucher/" + encodeURIComponent(v.name))
+      .then(function (r) { return r.data; })
+      .catch(function () { return v; });          // fall back to the summary row
+  }
+
   window.Storage = {
     mode: "frappe",
 
@@ -67,16 +75,23 @@
         var settings = res[2].data || {};
 
         // Daybook days carry a child table, so each needs its own fetch.
-        return Promise.all(dayNames.map(function (nm) {
-          return api("/api/resource/Daybook Day/" + encodeURIComponent(nm))
-                   .then(function (r) { return r.data; });
-        })).then(function (days) {
+        return Promise.all(
+          dayNames.map(function (nm) {
+            return api("/api/resource/Daybook Day/" + encodeURIComponent(nm))
+                     .then(function (r) { return r.data; });
+          }).concat(vouchers.map(withItems))
+        ).then(function (all) {
+          var days = all.slice(0, dayNames.length);
+          vouchers = all.slice(dayNames.length);
           var out = { entries: [], days: {}, sample: false };
           vouchers.forEach(function (v) {
             out.entries.push({
               id: v.name, no: v.name, date: v.posting_date, account: v.debited_account,
               payee: v.payee, address: v.address || "", particulars: v.particulars,
               amount: v.amount, category: v.unit, head: v.cost_head || "",
+              items: (v.items || []).map(function (r) {
+                return { particulars: r.particulars, amount: r.amount };
+              }),
               by: v.spent_by, approved: v.passed_by || "",
               mode: (v.mode || "Cash").toLowerCase().indexOf("upi") === 0 ? "upi"
                   : (v.mode || "").toLowerCase().indexOf("bank") === 0 ? "bank" : "cash",
@@ -110,8 +125,12 @@
           posting_date: e.date, unit: e.category,
           debited_account: e.account, cost_head: e.head || null,
           mode: e.mode === "upi" ? "UPI" : e.mode === "bank" ? "Bank / cheque" : "Cash",
-          payee: e.payee, address: e.address, particulars: e.particulars,
-          amount: e.amount, spent_by: e.by, passed_by: e.approved || null
+          payee: e.payee, address: e.address,
+          /* the server totals the lines and writes amount + summary itself */
+          items: (e.items || []).map(function (i) {
+            return { particulars: i.particulars, amount: i.amount };
+          }),
+          spent_by: e.by, passed_by: e.approved || null
         }
       }).then(function (r) { return r.data; });
     },
