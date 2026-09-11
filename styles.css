@@ -10,6 +10,8 @@
   --on-accent:#FDFCFA;
   --shadow:0 1px 2px rgba(28,26,23,.06),0 4px 14px rgba(28,26,23,.05);
   --r:5px;
+  /* side gutter: tight on a phone, generous on a desktop */
+  --gut:clamp(16px,3.2vw,44px);
   --sans:"IBM Plex Sans","IBM Plex Sans Devanagari",system-ui,-apple-system,Segoe UI,sans-serif;
   --slab:"Zilla Slab",Georgia,serif;
   --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -50,8 +52,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- masthead ---------- */
 .mast{background:var(--surface);border-bottom:1px solid var(--line-strong)}
-.mast-in{max-width:1240px;margin:0 auto;padding:13px 22px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
-.crest{width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-family:var(--slab);font-weight:700;font-size:15px;flex:none}
+.mast-in{max-width:1240px;margin:0 auto;padding:13px var(--gut);display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.crest{width:38px;height:38px;border-radius:50%;flex:none;display:block;object-fit:contain;
+       background:var(--surface-2)}
 .mast h1{font-size:16px;line-height:1.2}
 .mast .sub{font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-top:2px}
 .mast-spacer{flex:1 1 auto}
@@ -63,14 +66,14 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- tabs ---------- */
 .tabs{background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
-.tabs-in{max-width:1240px;margin:0 auto;padding:0 22px;display:flex;gap:2px;overflow-x:auto}
+.tabs-in{max-width:1240px;margin:0 auto;padding:0 var(--gut);display:flex;gap:2px;overflow-x:auto}
 .tab{background:none;border:0;border-bottom:2px solid transparent;padding:11px 15px 9px;cursor:pointer;color:var(--muted);font-weight:500;font-size:13.5px;white-space:nowrap;display:flex;gap:8px;align-items:baseline}
 .tab .hi{font-size:11.5px;opacity:.7}
 .tab:hover{color:var(--ink)}
 .tab[aria-selected="true"]{color:var(--accent-ink);border-bottom-color:var(--accent);font-weight:600}
 
 /* ---------- shell ---------- */
-main{max-width:1240px;margin:0 auto;padding:20px 22px 60px}
+main{max-width:1240px;margin:0 auto;padding:20px var(--gut) 60px}
 .view[hidden]{display:none!important}
 .split{display:grid;grid-template-columns:392px minmax(0,1fr);gap:20px;align-items:start}
 @media (max-width:940px){.split{grid-template-columns:1fr}}
@@ -99,11 +102,14 @@ input[type=number],.amt{font-family:var(--mono);font-variant-numeric:tabular-num
 .headnote{font-size:11px;color:var(--faint);margin-top:2px}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
 .words{font-size:12px;color:var(--accent-ink);background:var(--accent-soft);border-radius:4px;padding:6px 9px;min-height:29px;font-style:italic}
-.btn{background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);border-radius:4px;padding:9px 16px;font-weight:600;cursor:pointer;font-size:13.5px}
+.btn{background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);border-radius:4px;padding:9px 16px;font-weight:600;cursor:pointer;font-size:13.5px;white-space:nowrap}
 .btn:hover{filter:brightness(1.08)}
 .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line-strong);font-weight:500}
 .btn.ghost:hover{background:var(--surface-2);filter:none}
 .btn.sm{padding:5px 11px;font-size:12px}
+.btn.icon{display:inline-flex;align-items:center;gap:7px}
+.btn svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;
+         stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
 .btnrow{display:flex;gap:8px;flex-wrap:wrap}
 
 /* ---------- chips / pills ---------- */
@@ -131,6 +137,18 @@ tfoot td{border-top:1px solid var(--line-strong);border-bottom:0;font-weight:600
 .empty{padding:30px 16px;text-align:center;color:var(--muted);font-size:13px}
 .vno{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
 .lnk{background:none;border:0;padding:0;color:var(--accent-ink);cursor:pointer;font-size:12px;text-decoration:underline;text-underline-offset:2px}
+/* Icon buttons in the register's action column. The glyphs take their colour
+   from the button, so both themes work without a second icon set. */
+.acts{white-space:nowrap}
+.acts > * + *{margin-left:5px}
+.ibtn{background:none;border:1px solid transparent;border-radius:4px;padding:2px;
+      color:var(--muted);cursor:pointer;line-height:0;vertical-align:middle}
+.ibtn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.35;
+          stroke-linecap:round;stroke-linejoin:round}
+.ibtn:hover{color:var(--accent-ink);background:var(--accent-soft);border-color:var(--accent)}
+.ibtn.danger{color:var(--bad)}
+.ibtn.danger:hover{color:var(--bad);background:var(--bad-soft);border-color:var(--bad)}
+.ibtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
 /* ---------- daybook ---------- */
 .db-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
@@ -183,9 +201,9 @@ tfoot td{border-top:1px solid var(--line-strong);border-bottom:0;font-weight:600
 /* ---------- voucher slip — mirrors the printed NGHS voucher book ---------- */
 .slip{background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r);
       padding:22px 24px 18px;font-family:Arial,Helvetica,"Liberation Sans",sans-serif;color:var(--ink)}
-.slip .mh{text-align:center;margin-bottom:14px}
-.slip .mh .nm{font-family:"Oswald",Arial,sans-serif;font-weight:700;font-size:27px;line-height:1.05;letter-spacing:.005em}
-.slip .mh .pl{font-family:"Oswald",Arial,sans-serif;font-weight:500;font-size:14px;margin-top:1px}
+.slip .mh,.daysheet .mh{text-align:center;margin-bottom:14px}
+.slip .mh .nm,.daysheet .mh .nm{font-family:"Oswald",Arial,sans-serif;font-weight:700;font-size:27px;line-height:1.05;letter-spacing:.005em}
+.slip .mh .pl,.daysheet .mh .pl{font-family:"Oswald",Arial,sans-serif;font-weight:500;font-size:14px;margin-top:1px}
 .slip .fields{display:flex;flex-direction:column;gap:7px;margin-bottom:12px;font-size:12.5px}
 .slip .fr{display:flex;align-items:flex-end;gap:7px}
 .slip .fl{font-weight:700;white-space:nowrap;flex:none}
@@ -200,28 +218,106 @@ tfoot td{border-top:1px solid var(--line-strong);border-bottom:0;font-weight:600
 .slip .vt .filler td{height:20px}
 .slip .vt .wordrow td{font-weight:700}
 .slip .vt .wordrow .w{font-weight:400;font-family:"IBM Plex Sans",Arial,sans-serif;padding-left:6px}
-.slip .vt .wordrow .tl{font-weight:700;text-align:right;padding-right:8px}
+.slip .vt .wordrow .wl{display:flex;align-items:baseline}
+.slip .vt .wordrow .wl>span:first-child{flex:none;white-space:nowrap}
+.slip .vt .wordrow .w{flex:1;min-width:0}
+.slip .vt .wordrow .tl{flex:none;white-space:nowrap;font-weight:700;padding-right:8px}
 .slip .vt .grand{font-weight:700;font-size:14px}
-.slip .sigs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:26px}
+.slip .sigs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:18px}
 .slip .sigs.two{grid-template-columns:1fr 1fr;gap:40px}
 .slip .sig{text-align:center}
-.slip .sig .nm{font-family:"IBM Plex Sans",Arial,sans-serif;font-size:12.5px;min-height:17px;
+/* The name is printed at the top of the box and the rule is at the bottom of
+   it, so the blank between the two is where the signature goes. */
+.slip .sig .nm{font-family:"IBM Plex Sans",Arial,sans-serif;font-size:12.5px;min-height:38px;
                border-bottom:1px solid var(--line-strong);padding-bottom:2px;margin-bottom:4px}
 .slip .sig .lb{font-weight:700;font-size:11px}
 .slip .sig:last-child .lb{text-align:right}
 .slip .sig:first-child .lb{text-align:left}
+.foot{max-width:1240px;margin:0 auto;padding:0 var(--gut) 40px;font-size:11.5px;color:var(--faint)}
+
+/* ---------- sign-in card ----------
+   The staff who keep this book never meet the Frappe login page: a session
+   that has not signed in gets this, under the school's own name and emblem.
+   It is a real login -- the card posts to Frappe and takes back a session. */
+.gate{min-height:78vh;display:flex;align-items:center;justify-content:center;padding:40px 20px}
+.gate-card{background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r);
+           box-shadow:0 14px 44px rgba(0,0,0,.12);padding:30px 30px 24px;width:100%;max-width:380px;
+           text-align:center}
+.gate-logo{width:62px;height:62px;object-fit:contain;margin-bottom:12px}
+.gate-card h1{font-size:20px;line-height:1.25}
+.gate-sub{font-size:12.5px;color:var(--muted);margin-top:4px}
+.gate-card label{display:block;text-align:left;font-size:12px;font-weight:600;
+                 margin:16px 0 5px;color:var(--muted)}
+.gate-card label .hi{font-family:"IBM Plex Sans Devanagari","IBM Plex Sans",sans-serif;
+                     font-weight:400;opacity:.8;margin-left:5px}
+.gate-card input{width:100%}
+.gate-card .btn{width:100%;margin-top:20px;padding:11px 16px}
+.gate-card .btn[disabled]{opacity:.6;cursor:default}
+.gate-err{margin-top:14px;font-size:12.5px;color:var(--bad);text-align:left;line-height:1.45}
+.gate-err[hidden]{display:none}
+.gate-foot{margin-top:16px;font-size:11px;color:var(--faint);line-height:1.5}
+.gate-foot .hi{font-family:"IBM Plex Sans Devanagari","IBM Plex Sans",sans-serif}
 #printarea{display:none}
 @media print{
-  body{background:#fff;color:#000}
-  .mast,.tabs,main{display:none!important}
-  #printarea{display:block!important;padding:0}
-  #printarea .slip{border:0;box-shadow:none;padding:0;background:#fff;color:#000}
+  /* A5, and no page margin at all: with no margin left to draw in, Chrome and
+     Safari drop their own header and footer -- the date, the page title, the
+     URL and "1/1". The slip carries its own padding instead. */
+  @page{size:A5 landscape;margin:0}
+  body{background:#fff;color:#000;margin:0}
+  /* The voucher alone goes on the paper: no masthead, tabs, form or footnotes. */
+  .mast,.tabs,main,.foot{display:none!important}
+  #printarea{display:block!important;padding:9mm 8mm}
+  #printarea .slip,#printarea .daysheet{border:0;box-shadow:none;padding:0;background:#fff;color:#000}
+  #printarea .daysheet table.dt th,#printarea .daysheet table.dt td{border-color:#000}
+  #printarea .daysheet .memo td{color:#444}
   #printarea .slip .fv,#printarea .slip table.vt th,#printarea .slip table.vt td{border-color:#000}
   #printarea .slip .sig .nm{border-bottom-color:#666}
-  @page{size:A5;margin:12mm}
 }
-.foot{max-width:1240px;margin:0 auto;padding:0 22px 40px;font-size:11.5px;color:var(--faint)}
-.foot code{font-family:var(--mono);font-size:11px}
+
+/* ---------- confirmation dialog ----------
+   The actions that move money need a question the clerk can actually read, so
+   it carries the English line and the Hindi one beneath it in the smaller face
+   the form labels use. A native confirm() can only render one size of text. */
+.ask{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+     background:rgba(20,16,14,.45);padding:20px}
+.ask[hidden]{display:none}
+.ask-card{background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r);
+          box-shadow:0 14px 44px rgba(0,0,0,.24);padding:20px 22px;max-width:440px;width:100%}
+.ask-card h3{font-size:15.5px;line-height:1.35;margin-bottom:2px}
+.ask .ask-hi{font-size:12.5px;color:var(--muted);line-height:1.45}
+.ask .ask-note{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.5}
+.ask .ask-note[hidden],.ask .ask-hi[hidden]{display:none}
+#ask-input{margin-top:12px;width:100%}
+#ask-choices{margin-top:13px;display:grid;gap:8px}
+#ask-choices[hidden]{display:none}
+#ask-choices label{display:flex;align-items:center;gap:9px;font-size:13px;cursor:pointer;
+                   border:1px solid var(--line);border-radius:4px;padding:7px 10px}
+#ask-choices label:hover{border-color:var(--line-strong);background:var(--surface-2)}
+#ask-choices .amt{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+#ask-input[hidden]{display:none}
+.ask .ask-btns{margin-top:18px;justify-content:flex-end}
+/* the destructive action sits apart from Save, at the far left */
+#ask-extra{margin-right:auto}
+#ask-extra.ibtn{padding:7px;border-color:var(--line)}
+#ask-extra.ibtn svg{width:17px;height:17px}
+#ask-extra[hidden]{display:none}
+.ask .btn .hi{font-size:11.5px;font-weight:400;opacity:.75}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+
+/* ---------- day sheet (built for print) ---------- */
+.daysheet{background:#fff;color:var(--ink)}
+.daysheet .dtitle1{text-align:center;font-weight:700;font-size:17px;letter-spacing:.02em}
+.daysheet .dtitle2{text-align:center;font-weight:700;font-size:12.5px;margin:2px 0 10px}
+.daysheet .dstack > table.dt{margin-bottom:9px}
+.daysheet table.dt .subhead td{font-weight:700;background:var(--surface-2)}
+.daysheet .dcols{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+.daysheet table.dt{border-collapse:collapse;width:100%;font-size:11px;table-layout:fixed}
+.daysheet table.dt th,.daysheet table.dt td{border:1px solid var(--ink);padding:3px 7px;vertical-align:top}
+.daysheet table.dt th{text-align:center;font-weight:700}
+.daysheet table.dt td.r{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;width:92px}
+.daysheet table.dt.dn td.r{width:60px}
+.daysheet table.dt .grandrow td{font-weight:700;font-size:12px}
+.daysheet table.dt .memo td{font-size:10.5px;color:var(--muted)}
 
 /* ---------- voucher lines ---------- */
 .itemrow{display:grid;grid-template-columns:20px 1fr 92px 26px;gap:6px;align-items:center;margin-bottom:6px}

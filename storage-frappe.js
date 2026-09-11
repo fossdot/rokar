@@ -19,6 +19,26 @@
   var BASE = "";            // same-origin. Otherwise: "https://books.example.org"
   var CREDENTIALS = "same-origin";
 
+  /* Frappe reports failures as a JSON envelope inside a JSON string inside a
+     list. Dig the human sentence out of it; fall back to the raw text only when
+     the shape is not what we expect. */
+  function readableError(j, fallback) {
+    var out = [];
+    if (j && j._server_messages) {
+      try {
+        JSON.parse(j._server_messages).forEach(function (m) {
+          try { out.push(JSON.parse(m).message); } catch (e) { out.push(String(m)); }
+        });
+      } catch (e) { /* not the usual shape */ }
+    }
+    if (!out.length && j && j.exception) {
+      out.push(String(j.exception).replace(/^[\w.]*(?:Error|Exception):\s*/, ""));
+    }
+    if (!out.length && j && typeof j.message === "string") out.push(j.message);
+    var text = out.join(" ").replace(/<[^>]*>/g, "").trim();
+    return (text || fallback || "unknown error").slice(0, 300);
+  }
+
   function api(path, opts) {
     opts = opts || {};
     var headers = { Accept: "application/json" };
@@ -34,19 +54,31 @@
       body: opts.body ? JSON.stringify(opts.body) : undefined
     }).then(function (r) {
       return r.json().then(function (j) {
-        if (!r.ok) {
-          var msg = (j && (j.exception || j._server_messages || j.message)) || r.statusText;
-          throw new Error(String(msg).slice(0, 300));
-        }
+        if (!r.ok) throw new Error(readableError(j, r.statusText));
         return j;
       });
     });
   }
 
+  /* The roster lives on Rokar Settings as one name per line, so the app needs no
+     document per person. Blank lines and stray spaces are forgiven. */
+  function lines(text) {
+    return String(text || "").split("\n").map(function (x) { return x.trim(); })
+                             .filter(function (x) { return x.length; });
+  }
+
   var FIELDS = [
-    "name", "posting_date", "unit", "debited_account", "cost_head", "mode",
-    "payee", "address", "particulars", "amount", "spent_by", "passed_by", "docstatus"
+    "name", "posting_date", "unit", "debited_account", "cost_head",
+    "payee", "address", "particulars", "amount", "spent_by", "passed_by",
+    "docstatus"
   ];
+
+  /* Frappe's docstatus is the lifecycle app.js works in: 0 draft, 1 submitted,
+     2 cancelled. A cancelled voucher still belongs in the register, so it is
+     read back rather than filtered away. */
+  function statusFrom(docstatus) {
+    return docstatus === 1 ? "Submitted" : docstatus === 2 ? "Cancelled" : "Draft";
+  }
 
   /* Line items live in a child table, which a list query cannot return —
      each voucher needs its own fetch to rebuild its lines. */
@@ -63,7 +95,7 @@
     load: function () {
       return Promise.all([
         api("/api/resource/Cash Voucher?limit_page_length=0&filters=" +
-            encodeURIComponent('[["docstatus","<",2]]') +
+            encodeURIComponent('[["docstatus","<",3]]') +      /* drafts, submitted and cancelled */
             "&fields=" + encodeURIComponent(JSON.stringify(FIELDS))),
         api("/api/resource/Daybook Day?limit_page_length=0&filters=" +
             encodeURIComponent('[["docstatus","<",2]]') +
@@ -93,9 +125,8 @@
                 return { particulars: r.particulars, amount: r.amount };
               }),
               by: v.spent_by, approved: v.passed_by || "",
-              mode: (v.mode || "Cash").toLowerCase().indexOf("upi") === 0 ? "upi"
-                  : (v.mode || "").toLowerCase().indexOf("bank") === 0 ? "bank" : "cash",
-              submitted: v.docstatus === 1
+              status: statusFrom(v.docstatus),
+              serverSaved: true          /* so submit and cancel reach the server */
             });
           });
           days.forEach(function (d) {
@@ -106,11 +137,17 @@
             out.days[d.posting_date] = {
               date: d.posting_date, opening: d.opening_balance, fee: d.fee_cash,
               bus: d.bus_cash, wdl: d.bank_withdrawal, other: d.other_cash,
-              deposit: d.bank_deposit, upi: d.upi_received, denoms: denoms,
+              expenses: d.cash_expenses,
+              deposit: d.bank_deposit, upi: d.upi_received, utr: d.bank_utr || "",
+              denoms: denoms,
               closed: d.docstatus === 1
             };
           });
           out.openingSeed = settings.opening_cash_balance || 0;
+          out.people = lines(settings.accountants);
+          out.approvers = lines(settings.approvers);
+          out.payees = lines(settings.payees);
+          out.accounts = lines(settings.accounts);
           return JSON.stringify(out);
         });
       });
@@ -119,27 +156,54 @@
     /** Frappe owns naming, validation and the audit trail, so writes go
      *  per-document rather than as one blob. */
     saveVoucher: function (e) {
-      return api("/api/resource/Cash Voucher", {
-        method: "POST",
-        body: {
-          posting_date: e.date, unit: e.category,
-          debited_account: e.account, cost_head: e.head || null,
-          mode: e.mode === "upi" ? "UPI" : e.mode === "bank" ? "Bank / cheque" : "Cash",
-          payee: e.payee, address: e.address,
-          /* the server totals the lines and writes amount + summary itself */
-          items: (e.items || []).map(function (i) {
-            return { particulars: i.particulars, amount: i.amount };
-          }),
-          spent_by: e.by, passed_by: e.approved || null
-        }
-      }).then(function (r) { return r.data; });
+      var body = {
+        posting_date: e.date, unit: e.category,
+        debited_account: e.account, cost_head: e.head || null,
+        payee: e.payee, address: e.address,
+        /* the server totals the lines and writes amount + summary itself */
+        items: (e.items || []).map(function (i) {
+          return { particulars: i.particulars, amount: i.amount };
+        }),
+        spent_by: e.by, passed_by: e.approved || null
+      };
+      /* Editing a draft must update that document. Posting again would leave
+         two vouchers where the clerk corrected one. */
+      if (e.serverSaved && e.no) {
+        return api("/api/resource/Cash Voucher/" + encodeURIComponent(e.no),
+                   { method: "PUT", body: body }).then(function (r) { return r.data; });
+      }
+      return api("/api/resource/Cash Voucher", { method: "POST", body: body })
+               .then(function (r) { return r.data; });
     },
 
+    /** Submitting is a docstatus change on the stored document.
+     *  frappe.client.submit wants a whole doc dict including its `modified`
+     *  timestamp, and sending a partial one earns a TimestampMismatchError. */
     submitVoucher: function (name) {
-      return api("/api/method/frappe.client.submit", {
+      return api("/api/resource/Cash Voucher/" + encodeURIComponent(name),
+                 { method: "PUT", body: { docstatus: 1 } });
+    },
+
+    /** Delete, including after submit.
+     *
+     *  Frappe refuses outright: "Submitted Record cannot be deleted. You must
+     *  Cancel it first." So a submitted voucher is cancelled and then deleted,
+     *  two calls behind the one button. Cancelling alone would leave a
+     *  docstatus-2 row behind, which is exactly the withdrawn-document state
+     *  this app does not want.
+     */
+    deleteVoucher: function (name, submitted) {
+      var path = "/api/resource/Cash Voucher/" + encodeURIComponent(name);
+      var drop = function () { return api(path, { method: "DELETE" }); };
+      if (!submitted) return drop();
+      /* Delete either way. A voucher cancelled by an older build of this app,
+         or from the desk, cannot be cancelled twice -- but the delete is still
+         what was asked for, so that refusal must not stop it. Only a failed
+         DELETE is worth reporting. */
+      return api("/api/method/frappe.client.cancel", {
         method: "POST",
-        body: { doc: { doctype: "Cash Voucher", name: name } }
-      });
+        body: { doctype: "Cash Voucher", name: name }
+      }).then(drop, drop);
     },
 
     saveDay: function (d) {
@@ -152,7 +216,11 @@
           var existing = r.message || {};
           var body = {
             posting_date: d.date, fee_cash: d.fee, bus_cash: d.bus,
-            bank_withdrawal: d.wdl, other_cash: d.other, bank_deposit: d.deposit,
+            bank_withdrawal: d.wdl, other_cash: d.other,
+            /* typed by the clerk; vouchers never feed this */
+            cash_expenses: d.expenses,
+            bank_deposit: d.deposit,
+            bank_utr: d.utr || null,
             upi_received: d.upi, denominations: denominations
           };
           if (existing.name) {
@@ -163,11 +231,19 @@
         });
     },
 
-    /** Masters, so "+ add new" creates a real record other screens can link to. */
-    addMaster: function (doctype, title, extra) {
-      var body = { title: title };
-      if (extra) Object.keys(extra).forEach(function (k) { body[k] = extra[k]; });
-      return api("/api/resource/" + encodeURIComponent(doctype), { method: "POST", body: body });
+    /** The whole roster in one write. Adding, renaming and removing a name are
+     *  each just a different list, so there is nothing per-name to create or
+     *  rename, and no link left dangling. */
+    saveRoster: function (roster) {
+      return api("/api/resource/Rokar Settings/Rokar Settings", {
+        method: "PUT",
+        body: {
+          accountants: (roster.people || []).join("\n"),
+          approvers: (roster.approvers || []).join("\n"),
+          payees: (roster.payees || []).join("\n"),
+          accounts: (roster.accounts || []).join("\n")
+        }
+      });
     },
 
     /* The blob interface app.js currently calls. Frappe saves per document, so
@@ -177,20 +253,24 @@
 })();
 
 /* ---------------------------------------------------------------------------
- * ONE CHANGE app.js NEEDS
+ * WHAT app.js EXPECTS OF AN ADAPTER
  *
- * The localStorage adapter is synchronous; this one is not. In app.js, boot()
- * currently does:
+ * boot() already copes with either kind of load(): a string from localStorage,
+ * or a promise from here. Nothing else needs changing.
  *
- *     var raw = Storage.load();
+ * Required:   load(), save()
+ * Optional:   saveVoucher(entry)            create, or update when
+ *                                           entry.serverSaved is set
+ *             submitVoucher(name)           draft -> submitted
+ *             deleteVoucher(name, submitted)  removes it, cancelling first
+ *                                           when Frappe demands it
+ *             saveDay(day)
+ *             saveRoster({people, approvers, payees, accounts})
  *
- * Make boot() async and await it:
- *
- *     async function boot(){
- *       var raw = await Storage.load();
- *       ...
- *     }
- *
- * and have addVoucher() / saveDay() call Storage.saveVoucher() / saveDay()
- * instead of persist(). Everything else is untouched.
+ * Each optional call is made behind a feature check, so an adapter may
+ * implement as few as it likes; the browser copy of the books stays correct
+ * either way. A voucher carries `status` ("Draft" | "Submitted"); only
+ * Submitted vouchers reach the daybook, the monthly reports and the Tally
+ * export. There is no cancel and no amendment: a wrong voucher is deleted and
+ * written again.
  * ------------------------------------------------------------------------- */
