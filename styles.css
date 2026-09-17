@@ -265,12 +265,55 @@ tfoot td{border-top:1px solid var(--line-strong);border-bottom:0;font-weight:600
   body{background:#fff;color:#000;margin:0}
   /* The voucher alone goes on the paper: no masthead, tabs, form or footnotes. */
   .mast,.tabs,main{display:none!important}
-  #printarea{display:block!important;padding:9mm 8mm}
-  #printarea .slip,#printarea .daysheet{border:0;box-shadow:none;padding:0;background:#fff;color:#000}
+  #printarea{display:block!important;padding:0}
+  #printarea .slip,#printarea .daysheet{border:0;box-shadow:none;background:#fff;color:#000}
+  #printarea .daysheet{padding:9mm 8mm}
   #printarea .daysheet table.dt th,#printarea .daysheet table.dt td{border-color:#000}
   #printarea .daysheet .memo td{color:#444}
   #printarea .slip .fv,#printarea .slip table.vt th,#printarea .slip table.vt td{border-color:#000}
   #printarea .slip .sig .nm{border-bottom-color:#666}
+
+  /* The paper is half an A4 sheet, and the voucher is drawn to fill it, the
+     way the school's own printed book does: a masthead across the top, the
+     signature line hard against the bottom, and the table taking whatever
+     height is left between them -- so a voucher of one line and a voucher of
+     four come off the printer the same size. The screen preview keeps its own
+     smaller sizes; these apply to the paper alone. */
+  #printarea .slip{display:flex;flex-direction:column;height:147.5mm;padding:6mm 8mm}
+  #printarea .slip .mh{margin-bottom:3mm}
+  #printarea .slip .mh .nm{font-size:34px}
+  #printarea .slip .mh .pl{font-size:18px;margin-top:2px}
+  #printarea .slip .fields{font-size:15px;gap:2.2mm;margin-bottom:3.5mm}
+  #printarea .slip .fr{gap:9px}
+  #printarea .slip .fv{min-height:5mm;padding-bottom:2px}
+  #printarea .slip table.vt{flex:1;font-size:15px;margin-bottom:0}
+  #printarea .slip table.vt th,#printarea .slip table.vt td{padding:1.2mm 3mm}
+  #printarea .slip table.vt th{font-size:14.5px}
+  /* A floor under each line, so no row is left hairline-thin; the stretch the
+     table takes from the page does the rest. A blank cell holds no line of
+     text and would stay short while the rows that carry one take all of that
+     stretch, so the blank rows are given a space of their own to stand on and
+     the slack is shared out evenly. */
+  #printarea .slip table.vt tbody td{height:5.5mm}
+  #printarea .slip table.vt .filler td::before{content:"\00a0"}
+  /* More lines than the book's four, and the rows draw themselves tighter a
+     step at a time rather than push the signature line onto a second sheet.
+     Eleven lines still come off the printer as one voucher. */
+  #printarea .slip table.vt:has(tbody tr:nth-child(5)) th,
+  #printarea .slip table.vt:has(tbody tr:nth-child(5)) td{height:auto;padding:.8mm 3mm}
+  #printarea .slip table.vt:has(tbody tr:nth-child(6)) th,
+  #printarea .slip table.vt:has(tbody tr:nth-child(6)) td{padding:.5mm 3mm;font-size:14px}
+  #printarea .slip table.vt:has(tbody tr:nth-child(8)) th,
+  #printarea .slip table.vt:has(tbody tr:nth-child(8)) td{padding:.2mm 2.5mm;font-size:12.5px}
+  #printarea .slip table.vt:has(tbody tr:nth-child(10)) th,
+  #printarea .slip table.vt:has(tbody tr:nth-child(10)) td{padding:0 2mm;font-size:11px}
+  #printarea .slip .c-sn{width:17mm}
+  #printarea .slip .c-amt{width:30mm}
+  #printarea .slip .vt .wordrow .w{padding-left:8px}
+  #printarea .slip .vt .grand{font-size:17px}
+  #printarea .slip .sigs{margin-top:4mm}
+  #printarea .slip .sig .nm{font-size:14.5px;min-height:8mm}
+  #printarea .slip .sig .lb{font-size:13.5px}
 }
 
 /* ---------- confirmation dialog ----------
