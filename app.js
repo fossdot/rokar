@@ -730,8 +730,7 @@ function setPageSize(spec){
 /* The day sheet the foundation already uses: NGHS's own wording and order,
    the cash account and note count down the left, the bank deposit down the
    right. One A4 landscape page. The day's spending is not itemised here --
-   the vouchers themselves are the record of it, so the sheet carries only the
-   one "Expenses" total in the cash account. */
+   the vouchers themselves are the record of it. */
 /* What the daybook form holds this moment, in the shape a saved day has, so
    the sheet can be printed before the day is closed as well as afterwards. */
 function formDay(){
